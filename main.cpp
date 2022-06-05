@@ -1,4 +1,4 @@
-//RA 123/2072 Petar Petrovic, Termin vezbi: Pon 07:00. Radjeno: SOV-AB. Komentari: ...
+//RA 91/2020 Anja Ekres, Termin vezbi: Pet 10:30. Radjeno: SOV-AB. Komentari: Za termin sam stavila termin sa stud. sluzbe (6. grupa), ali dolazim na vezbe Sre 10:30 (7. grupa)
 //SOV pripremni zadatak, molim pogledajte detalje u priloženim uputstvima
 #include <iostream>
 #include <cstdlib>
