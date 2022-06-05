@@ -78,7 +78,7 @@ void resizeHandler(){
         fw = create_newwin(footerHeight, footerWidth, footerStartY, footerStartX);
         wrefresh(mw);
         wattron(fw, COLOR_PAIR(CL_CONTROLS));
-        mvwprintw(fw, 1, 1, " F1 ");
+        mvwprintw(fw, 1, 1, " F6 ");
         wattroff(fw, COLOR_PAIR(CL_CONTROLS));
         wprintw(fw, "Zaustavi program    ");
         wattron(fw, COLOR_PAIR(CL_CONTROLS));
@@ -143,7 +143,7 @@ int main(){
     fw = create_newwin(footerHeight, footerWidth, footerStartY, footerStartX);
 
     wattron(fw, COLOR_PAIR(CL_CONTROLS));
-    mvwprintw(fw, 1, 1, " F1 ");
+    mvwprintw(fw, 1, 1, " F6 ");
     wattroff(fw, COLOR_PAIR(CL_CONTROLS));
     wprintw(fw, "Zaustavi program    ");
     wattron(fw, COLOR_PAIR(CL_CONTROLS));
@@ -251,7 +251,7 @@ int main(){
         }        
         wtimeout(mw, 0);
         int rez = wgetch(mw);
-        if(rez == KEY_F(1)){
+        if(rez == KEY_F(6)){
             write(output, "qq", 2);
             endwin();
             close(output);
