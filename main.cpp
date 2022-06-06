@@ -328,9 +328,9 @@ class SegmentTable{ //Tabela segmenata za neki proces
         */
         int getRandomID(default_random_engine& gen){
             uniform_int_distribution<int> d(0, table.size() - 1);
-            int x = d(gen);
+            int x = d(gen); // pretvori broj iz gen u broj iz intervala ^
             int i = 0;
-            for(pair<int, TableEntry> p : table){
+            for(pair<int, TableEntry> p : table){ // vraca ID x-tog elementa mape
                 if(i == x){
                     return p.first;
                 }
@@ -341,6 +341,7 @@ class SegmentTable{ //Tabela segmenata za neki proces
         }
     private:
         map<int, TableEntry> table;
+
         /*
             Kod nađe najveći ID date tabele i vrati tu vrednost uvećanu za 1. To
             garantuje jedinstven ID. 
@@ -368,7 +369,7 @@ class SystemMemory{
             //Na početku je sva memorija slobodna što znači da se naša evidencija
             //slobodne memorije od 1 odsečka koji počinje od 0 i veliki je
             //koliko uopšte ima memorije. 
-            freeMemory.push_back((Fragment) {.loc=0, .len=(u32)capacity});
+            freeMemory.push_back((Fragment) {.loc=0, .len=(u32)capacity}); // zanimljiva lambda*?
         }
         ~SystemMemory(){
             free(mem);//Moramo osloboditi zauzeto
@@ -377,8 +378,11 @@ class SystemMemory{
         //Operacija čitanja. Primetite adresu koja je segment + logička adresa
         char read(int processID, int segmentID, u32 logicalAddress){
             unique_lock<mutex> l(mSegments[segmentTables[processID].getEntry(segmentID).m].m);
+
             cadh.readMessage(processID, logicalAddress, segmentID);//Ispisuje na ekran
+
             int loc = segmentTables[processID].getEntry(segmentID).base;
+
             if(logicalAddress >= segmentTables[processID].getEntry(segmentID).len){ //Provera prava pristupa
                 cerr << "Internal segmentation violation." << endl;
                 exit(2);
@@ -387,22 +391,25 @@ class SystemMemory{
         }
         void write(int processID, int segmentID, u32 logicalAddress, char value){
             unique_lock<mutex> l(mSegments[segmentTables[processID].getEntry(segmentID).m].m);
+
             cadh.writeMessage(processID, logicalAddress, segmentID);
+
             int loc = segmentTables[processID].getEntry(segmentID).base;
+
             if(logicalAddress >= segmentTables[processID].getEntry(segmentID).len){
                 cerr << "Internal segmentation violation." << endl;
                 exit(2);
             }
             mem[loc + logicalAddress] = value;
         }
-        
-        int allocate(int processID, u32 amount){
+        //Vraca mesto zauzete memorije
+        int allocate(int processID, u32 amount){ // proces trazi da se alocira kolicina memorije
             if(!segmentTables.count(processID)){ //U slučaju da ovo zovemo prvi put za dati proces, ubacujemo novu tabelu
                 {
                     unique_lock<mutex> l(mAllocate);
                     segmentTables.insert(pair<int, SegmentTable>(processID, SegmentTable()));
                 }//Ubacivanje menja deljenu klasu te je stavljamo u isključiv region.
-                int loc = -1;
+                int loc = -1; // location
                 {
                     unique_lock<mutex> l(mAllocate);//I ovde zaključavamo: rad sa evidencijom slobodne memorije je takođe rad sa deljenim resursom
                     while((loc = findFree(amount)) < 0){
@@ -410,7 +417,7 @@ class SystemMemory{
                         cadh.incWaiting();
                         cvFree.wait(l);
                         cadh.decWaiting();
-                        if(terminal) return -1; //Proveravamo da li nas je probudio ne uspeh u alokaciji, no proces gašenja.
+                        if(terminal) return -1; //Proveravamo da li nas je probudio neuspeh u alokaciji, no proces gašenja.
                     }
                 }
                 //Sada kada imamo odakle počinje naša slobodna memorija (u loc) napravimo segment i stavimo ga u evidenciju
@@ -455,10 +462,10 @@ class SystemMemory{
                     ######  ****######## prelazi u ######  ************
                     ######******######## prelazi u ####################
                 */
-                for(it = freeMemory.begin(); it != freeMemory.end();it++){
+                for(it = freeMemory.begin(); it != freeMemory.end(); it++){
                     if(it->loc > loc) break;
                 }
-                if(it == freeMemory.begin()){
+                if(it == freeMemory.begin()){ // ako vracas fragment na pocetak
                     freeMemory.push_front((Fragment) {.loc = (u32)loc, .len = (u32)len});
                     it = freeMemory.begin();
                     list<Fragment>::iterator next = it;
@@ -479,12 +486,12 @@ class SystemMemory{
                     }
                 }else{
                     it--;
-                    if((it->loc + it->len) == loc){
+                    if((it->loc + it->len) == loc){ // da li je spojen sa prethodnim
                         it->len = it->len + len;
                         list<Fragment>::iterator next = it;
                         next++;
-                        if(next != freeMemory.end()){
-                            if(it->loc + it->len == next->loc){
+                        if(next != freeMemory.end()){ // da li postoji sledeci
+                            if(it->loc + it->len == next->loc){ // da li je spojen sa sledecim
                                 it->len = it->len + next->len;
                                 freeMemory.erase(next);
                                 cadh.deallocateMessage(processID, loc, len, it->loc, it->len);
@@ -503,7 +510,7 @@ class SystemMemory{
                         list<Fragment>::iterator next = it;
                         next++;
                         if(next != freeMemory.end()){
-                            if(it->loc + it->len == next->loc){
+                            if(it->loc + it->len == next->loc){ // da li je spojen sa sledecim
                                 it->len = it->len + next->len;
                                 freeMemory.erase(next);
                                 cadh.deallocateMessage(processID, loc, len, it->loc, it->len);
@@ -532,6 +539,7 @@ class SystemMemory{
             cvFree.notify_all();
             cvCompaction.notify_all();
         }
+
         void compactionProcess(){
             bool foundCandidate = false;
             int cProcess = -1;
@@ -549,19 +557,20 @@ class SystemMemory{
                         list<Fragment>::iterator it = freeMemory.begin();
                         list<Fragment>::iterator targetFragment = freeMemory.begin(); 
                         for(Fragment f : freeMemory){
-                            if(((int)f.len - (int)pp.second.len) < targetInefficiency && ((int)f.len - (int)pp.second.len) > 0){
+                            if(((int)f.len - (int)pp.second.len) < targetInefficiency && ((int)f.len - (int)pp.second.len) > 0){ // trazimo fragment
+                            // najblize duzine sa TableEntry-jem
                                 targetInefficiency = (int)f.len - (int)pp.second.len;
                                 targetFragment = it;
                             }
                             if(f.loc + f.len == pp.second.base){
                                 gapBack = f.len;
-                            }else if(f.loc + f.len == pp.second.base + pp.second.len){
+                            }else if(f.loc == pp.second.base + pp.second.len){ 
                                 gapForward = f.len;
                             }
                             it++;
                         }
                         inefficiency = gapBack + gapForward;
-                        if(inefficiency > targetInefficiency + 8192){
+                        if(inefficiency > targetInefficiency + 8192){ // plus sta 2^13 zasto?
                             if(targetFragment->len == pp.second.len){
                                 target = *targetFragment;
                                 freeMemory.erase(targetFragment);
@@ -594,7 +603,7 @@ class SystemMemory{
                 this_thread::sleep_for(chrono::milliseconds(50)); 
                 TableEntry* te = &((segmentTables[cProcess]).table[cSegment]);
                 cadh.compactionMessage(cProcess, cSegment, te->base, te->len, target.loc);
-                for(int i = 0;i < te->len;i++){
+                for(int i = 0;  i < te->len; i++){ // memorija je vec zauzeta i zbog toga ovaj segment nije lock-ovan
                     mem[target.loc + i] = mem[te->base + i];
                 }
                 int loc = te->base;
@@ -602,7 +611,7 @@ class SystemMemory{
                 te->base = target.loc;
                 mSegments[cSegmentM].m.unlock();
                 {
-                    unique_lock<mutex> l(mAllocate);
+                    unique_lock<mutex> l(mAllocate); // oslobadjanje memorije
                     list<Fragment>::iterator it;
                 /*
                     Ovde se implementira algoritam koji smo diskutovali
@@ -616,8 +625,10 @@ class SystemMemory{
                     ######****  ######## prelazi u ##########  ########
                     ######  ****######## prelazi u ######  ************
                     ######******######## prelazi u ####################
-                */
-                    for(it = freeMemory.begin(); it != freeMemory.end();it++){
+
+                    ovo je vec jednom implementirano, zasto ne postoji funkcija koja radi ovo?
+                */ 
+                    for(it = freeMemory.begin(); it != freeMemory.end(); it++){
                         if(it->loc > loc) break;
                     }
                     if(it == freeMemory.begin()){
@@ -713,13 +724,13 @@ class SystemMemory{
             }
             return -1;
         }
-
+        // IMPLEMENTIRANO NE GLEDAJ
         /*
             Implementacija first fit algoritma. Prvi odsečak koji je dovoljno veliki
             se odabira. Ako je taman veličine ceo se izvozi. Ako je veći, mrvi se
             tako što se početak odsečka pomera unapred za zauzet prostor i dužina
             se adekvatno smanjuje, a kao povratna vrednost se daje pređašnja adresa
-            početka tog odsečka. 
+            početka tog odsečka.  zasto ljudi ne znaju da sastave 4 recenice na natural language-u ?
         */
         int findFree(u32 amount){
             if(type == EF_FIRSTFIT){
@@ -810,7 +821,7 @@ class Process{
     public:
         Process(IDManager& idm, SystemMemory& sm, Diagnostics& dd) : systemMemory(sm), segmentSizeDistribution(1,25), stepDistribution(1,100), terminate(false), cadh(dd){
                id = idm.getProcessID();
-               hrc_t::duration d = hrc_t::now() - start;
+               hrc_t::duration d = hrc_t::now() - start; // rnd seed
                auto x = d.count();
                x = x ^ (id << 7);//Dozvoljavamo bitovima id-a da utiču na seed vrednost
                //generatora slučajnih brojeva ovog procesa. Ovo omogućava da slučajne
@@ -821,7 +832,7 @@ class Process{
         void run(){
             cout << "Running process with ID" << id << endl;
             //Pravljenje početnog, permanentnog segmenta. 
-            u32 amount = segmentSizeDistribution(generator) * 4096;
+            u32 amount = segmentSizeDistribution(generator) * 4096; // velicina
             int permanentSegment = systemMemory.allocate(id, amount);
             localTable.insert(pair<int, u32>(permanentSegment, amount));
             while(1){
@@ -829,7 +840,7 @@ class Process{
                 int step = stepDistribution(generator);//Vrednost od 1 do 100
                 //Što nam omogućava da precizno definišemo šanse za različite
                 //korake simulacije. 
-                if(step < 7){
+                if(step < 7){ // zauzmi nesto memorije
                     if(!allocationEnabled) continue;
                     //Veličina za alokaciju koja je umnožak 4096. 
                     u32 amount = segmentSizeDistribution(generator) * 4096;
@@ -840,18 +851,18 @@ class Process{
                         continue;
                     }
                     localTable.insert(pair<int, u32>(seg, amount));
-                }else if(step >= 7 && step < 10){
+                }else if(step >= 7 && step < 10){ // vrati memoriju
                     int seg = systemMemory.getRandomID(id, generator);
                     if(seg == permanentSegment) continue; //Ne dozvoljavamo
                     //da se oslobodi permanentni segment
                     systemMemory.deallocate(id, seg);
                     localTable.erase(seg);                    
-                }else if(step >= 10 && step < 80){
+                }else if(step >= 10 && step < 80){ // procitaj memoriju
                     int seg = systemMemory.getRandomID(id, generator);
                     uniform_int_distribution<u32> sd(0, localTable[seg] - 1);
                     u32 logicalAddress = sd(generator);
                     systemMemory.read(id, seg, logicalAddress);
-                }else if(step >= 80 && step < 101){
+                }else if(step >= 80 && step < 101){ // promeni memoriju
                     int seg = systemMemory.getRandomID(id, generator);
                     uniform_int_distribution<u32> sd(0, localTable[seg] - 1);
                     uniform_int_distribution<int> dd(-1000000, 1000000);
@@ -875,7 +886,7 @@ class Process{
         Diagnostics& cadh;
         default_random_engine generator;
         SystemMemory& systemMemory;
-        map<int, u32> localTable;
+        map<int, u32> localTable; // mesto i velicina zauzete memorije
         uniform_int_distribution<int> segmentSizeDistribution; 
         uniform_int_distribution<int> stepDistribution;
         bool terminate; 
@@ -896,7 +907,7 @@ void outputRunner(Diagnostics& d){
 
 //Globalni pokazivači da bi mogli da pristupimo ključnim strukturama programa iz
 //Obrađivača signala. 
-SystemMemory* pMem = NULL;
+SystemMemory* pMem = NULL; // pokazivac na celu memoriju
 Process* processes = NULL;
 
 //Obrađivač signala koji se poziva kada se pritisne CTRL+C
