@@ -1,4 +1,4 @@
-//RA 91/2020 Anja Ekres, Termin vezbi: Pet 10:30. Radjeno: SOV-AB. Komentari: Za termin sam stavila termin sa stud. sluzbe (6. grupa), ali dolazim na vezbe Sre 10:30 (7. grupa)
+//RA 91/2020 Anja Ekres, Termin vezbi: Pet 10:30. Radjeno: SOV-A. Komentari: Za termin sam stavila termin sa stud. sluzbe (6. grupa), ali dolazim na vezbe Sre 10:30 (7. grupa)
 //SOV pripremni zadatak, molim pogledajte detalje u priloženim uputstvima
 #include <iostream>
 #include <cstdlib>
@@ -17,6 +17,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <csignal>
+
+#include <algorithm>
 
 using namespace std;
 
@@ -56,6 +58,11 @@ void intHandler(int sig);
 
 mutex mCompaction;
 condition_variable cvCompaction;
+
+struct FullSegmentID{
+    int processID;
+    int segmentID;
+}
 
 struct Fragment{ //Jedan fragment slobodne memorije
     u32 loc;
@@ -441,7 +448,10 @@ class SystemMemory{
                 cadh.allocateMessage(processID, (u32)loc, amount, ret);
                 return ret;
             }
+
+            updateMemoryInfo();
         }
+
         void deallocate(int processID, int segmentID){
             int loc = segmentTables[processID].getEntry(segmentID).base;
             int len = segmentTables[processID].getEntry(segmentID).len;
@@ -528,6 +538,8 @@ class SystemMemory{
                 mSegments[segmentTables[processID].getEntry(segmentID).m].taken = false;
                 segmentTables[processID].deleteSegment(segmentID);
             }
+
+            updateMemoryInfo();
         }
         //Ovo je ono što u stvari zove proces, ovo ga samo usmeri gde treba
         int getRandomID(int processID, default_random_engine& gen){
@@ -564,7 +576,7 @@ class SystemMemory{
                             }
                             if(f.loc + f.len == pp.second.base){
                                 gapBack = f.len;
-                            }else if(f.loc == pp.second.base + pp.second.len){ 
+                            }else if(f.loc + f.len == pp.second.base + pp.second.len){ 
                                 gapForward = f.len;
                             }
                             it++;
@@ -693,6 +705,8 @@ class SystemMemory{
                     }
                 }
             }
+
+            updateMemoryInfo();
         }
 
         void compactionRunner(){
@@ -708,6 +722,47 @@ class SystemMemory{
                 this_thread::sleep_for(chrono::milliseconds(10));
             }
         }
+
+        void updateMemoryInfo()
+        {
+            u32 newPages; // u 4K stranicama
+            u32 newSize = 0;
+            char newUnit;
+            u32 newContiguous; // u 4K stranicama
+            u32 maxContigSize = 0;
+
+            {
+                unique_lock lock(mAllocate);
+
+                for (list<Fragment>::iterator iter = freeMemory.begin(); iter != freeMemory.end(); iter++)
+                {
+                    newSize += iter->len;
+                    maxContigSize = max(maxContigSize, iter->len);
+                }
+
+            }
+
+            newPages = newSize / 4096; // 4K stranice iz zadatka?
+            newContiguous = maxContigSize / 4069;
+
+            if (newSize >= 1000000)
+            {
+                newUnit = 'M';
+                newSize /= 1000000;
+            }
+            else if (newSize >= 1000)
+            {
+                newUnit = 'K';
+                newSize /= 1000;
+            }
+            else
+            {
+                newUnit = 'b';
+            }
+
+            cadh.reportFreeSpace(newPages, newSize, newUnit, newContiguous);
+        }
+
     private:
         char *mem;
         bool terminal;
