@@ -62,7 +62,7 @@ condition_variable cvCompaction;
 struct FullSegmentID{
     int processID;
     int segmentID;
-}
+};
 
 struct Fragment{ //Jedan fragment slobodne memorije
     u32 loc;
@@ -723,8 +723,7 @@ class SystemMemory{
             }
         }
 
-        void updateMemoryInfo()
-        {
+        void updateMemoryInfo(){
             u32 newPages; // u 4K stranicama
             u32 newSize = 0;
             char newUnit;
@@ -737,7 +736,7 @@ class SystemMemory{
                 for (list<Fragment>::iterator iter = freeMemory.begin(); iter != freeMemory.end(); iter++)
                 {
                     newSize += iter->len;
-                    maxContigSize = max(maxContigSize, iter->len);
+                    maxContigSize = max((int) maxContigSize, (int) iter->len);
                 }
 
             }
